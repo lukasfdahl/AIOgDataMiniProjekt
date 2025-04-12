@@ -3,6 +3,7 @@ import numpy as np
 from sklearn.experimental import enable_iterative_imputer  # enable experimental
 from sklearn.impute import IterativeImputer
 from sklearn.linear_model import BayesianRidge
+from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import OrdinalEncoder
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.ensemble import RandomForestClassifier
@@ -14,7 +15,8 @@ def main():
     #---------- Imputation ----------#
     #--------------------------------#
     dataset = pd.read_csv("datasæt/medical_students_dataset.csv")
-    preprocess_student_id(dataset) #fill missing student id's
+    print(dataset)
+    dataset = preprocess_student_id(dataset) #fill missing student id's
     dataset = preprocess_height_weight_bmi(dataset) #calculate BMI, Height, Weight from each other
 
     #here i use encoding to make sure everything is numbers, so that i later can use regression impuation to find the missing values
@@ -33,7 +35,7 @@ def main():
 
     #here i use regression imputation to fill the remaning missing values, using sklearns itterative imupter and bayesianRidge as the regression model
     #bayesianRidge should be more stable than linear rgeression and handle highly correlated features better
-    imputer = IterativeImputer(estimator=BayesianRidge(), max_iter=10, random_state=0)
+    imputer = IterativeImputer(estimator=LinearRegression(), max_iter=10, random_state=0)
     dataset =   pd.DataFrame(imputer.fit_transform(dataset), columns=dataset.columns)
 
     #randomforest imputation for blood type.
@@ -46,7 +48,7 @@ def main():
     dataset = pd.concat([dataset, dataset_blood_type], axis=1)
 
     print(dataset)
-
+    
 
     #---------------------------------#
     #-------------- SQL --------------#
@@ -123,12 +125,13 @@ def print_na_count(dataset : pd.DataFrame, name : str):
 def preprocess_student_id(dataset : pd.DataFrame):
     #student id just goes up one for each row, resetting halfway thrugh, so it can easily be imputated with the following:
     dataset["Student ID"] = (dataset.index % 100000) + 1
+    return dataset
 
 def preprocess_height_weight_bmi(dataset : pd.DataFrame):
     #if only one of BMI, Height, Weight is missing, the remaning one can be calculated with the formular for bmi
-    dataset["BMI"] = dataset.apply(lambda x: x["Weight"] / (x["Height"]**2) if pd.notna(x["Height"]) and pd.notna(x["Weight"]) and pd.isna(x["BMI"]) else x["BMI"], axis=1)
-    dataset["Height"] = dataset.apply(lambda x: np.sqrt(x["Weight"] / x["BMI"]) if pd.isna(x["Height"]) and pd.notna(x["Weight"]) and pd.notna(x["BMI"]) else x["Height"], axis=1)
-    dataset["Weight"] = dataset.apply(lambda x: x["Weight"] * x["Height"]**2 if pd.notna(x["Height"]) and pd.isna(x["Weight"]) and pd.notna(x["BMI"]) else x["Weight"], axis=1)
+    dataset["BMI"] = dataset.apply(lambda x: x["Weight"] / ((x["Height"]/100)**2) if pd.notna(x["Height"]) and pd.notna(x["Weight"]) and pd.isna(x["BMI"]) else x["BMI"], axis=1)
+    dataset["Height"] = dataset.apply(lambda x: np.sqrt(x["Weight"] / x["BMI"])*100 if pd.isna(x["Height"]) and pd.notna(x["Weight"]) and pd.notna(x["BMI"]) else x["Height"], axis=1)
+    dataset["Weight"] = dataset.apply(lambda x: x["Weight"] * (x["Height"]/100)**2 if pd.notna(x["Height"]) and pd.isna(x["Weight"]) and pd.notna(x["BMI"]) else x["Weight"], axis=1)
     return dataset
 
 
